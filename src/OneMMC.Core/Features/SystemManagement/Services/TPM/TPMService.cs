@@ -43,14 +43,19 @@ namespace OneMMC.Core.Features.SystemManagement.Services.TPM
         public TPMInfo GetTPMInformation()
         {
             var info = new TPMInfo();
+            var L = LocalizationProvider.Current;
 
             try
             {
-                // Query TPM using WMI
+                // Query TPM using WMI. A successful connection with zero instances means the
+                // machine has no TPM (or firmware has hidden it), which is distinct from access denied.
                 using (var connection = new WmiConnection(TpmNamespace))
                 {
+                    var found = false;
                     foreach (WmiObject obj in connection.CreateQuery(TpmQuery).DisposeItems())
                     {
+                        found = true;
+
                         // Get TPM version
                         info.SpecVersion = obj["SpecVersion"]?.ToString() ?? "Unknown";
                         info.ManufacturerVersion = obj["ManufacturerVersion"]?.ToString() ?? "Unknown";
@@ -67,20 +72,30 @@ namespace OneMMC.Core.Features.SystemManagement.Services.TPM
 
                         info.IsAvailable = true;
                     }
+
+                    if (!found)
+                    {
+                        info.IsAvailable = false;
+                        info.ErrorMessage = L.GetString(ResourceFileNames.TPM, TPMKeys.NotAvailable);
+                    }
                 }
+            }
+            catch (WmiException ex) when (!_adminService.IsRunningAsAdmin || _adminService.IsPermissionError(ex))
+            {
+                info.IsAvailable = false;
+                info.IsAccessDenied = true;
+                info.ErrorMessage = L.GetString(ResourceFileNames.TPM, TPMKeys.AccessDenied);
             }
             catch (WmiException)
             {
-                // TPM might not be available or accessible
                 info.IsAvailable = false;
-                info.ErrorMessage = _adminService.IsRunningAsAdmin
-                    ? LocalizationProvider.Current.GetString(ResourceFileNames.TPM, TPMKeys.NotAvailable)
-                    : LocalizationProvider.Current.GetString(ResourceFileNames.TPM, TPMKeys.AccessDenied);
+                info.ErrorMessage = L.GetString(ResourceFileNames.TPM, TPMKeys.NotAvailable);
             }
             catch (Exception ex)
             {
                 info.IsAvailable = false;
-                info.ErrorMessage = $"Error: {ex.Message}";
+                info.IsQueryFailed = true;
+                info.ErrorMessage = $"{L.GetString(ResourceFileNames.TPM, TPMKeys.CannotGetInfo)}: {ex.Message}";
             }
 
             return info;
@@ -283,6 +298,8 @@ namespace OneMMC.Core.Features.SystemManagement.Services.TPM
     public class TPMInfo
     {
         public bool IsAvailable { get; set; }
+        public bool IsAccessDenied { get; set; }
+        public bool IsQueryFailed { get; set; }
         public bool IsReady { get; set; }
         public bool IsEnabled { get; set; }
         public bool IsActivated { get; set; }

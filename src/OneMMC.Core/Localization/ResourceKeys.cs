@@ -800,6 +800,11 @@ public static class DeviceManagerKeys
     public const string HiddenDevices = "DeviceManager_HiddenDevices";
     public const string DeviceCountPrefix = "DeviceManager_DeviceCountPrefix";
     public const string DeviceCountSuffix = "DeviceManager_DeviceCountSuffix";
+
+    /// <summary>
+    /// Prefix for per-PNPClass display names (<c>DeviceManager_Category_{Class}</c>).
+    /// </summary>
+    public const string CategoryKeyPrefix = "DeviceManager_Category_";
     
     // Device Status Descriptions
     public const string StatusWorking = "DeviceManager_StatusWorking";
@@ -864,7 +869,13 @@ public static class TPMKeys
     public const string ClearTPMError = "TPM_ClearTPMError";
     public const string VersionFormat = "TPM_VersionFormat";
     public const string NotAvailable = "TPM_NotAvailable";
+    public const string NotAvailableTitle = "TPM_NotAvailableTitle";
+    public const string NotAvailableMessage = "TPM_NotAvailableMessage";
+    public const string UnavailableValue = "TPM_UnavailableValue";
     public const string AccessDenied = "TPM_AccessDenied";
+    public const string AccessDeniedTitle = "TPM_AccessDeniedTitle";
+    public const string ClearTPMDescription = "TPM_ClearTPMDescription";
+    public const string ClearTPMDisabledDescription = "TPM_ClearTPMDisabledDescription";
     public const string ClearAllMethodsFailed = "TPM_ClearAllMethodsFailed";
     public const string WmiAccessDenied = "TPM_WmiAccessDenied";
 }

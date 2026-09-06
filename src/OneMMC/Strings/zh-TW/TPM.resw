@@ -92,6 +92,9 @@
   <data name="TPM_ClearTPMDescription" xml:space="preserve">
     <value>清除 TPM 安全性硬體（需要重新啟動並執行確認步驟）</value>
   </data>
+  <data name="TPM_ClearTPMDisabledDescription" xml:space="preserve">
+    <value>此電腦沒有可用的 TPM，因此無法使用此功能</value>
+  </data>
   <data name="TPM_AboutHeader" xml:space="preserve">
     <value>關於 TPM</value>
   </data>
@@ -167,8 +170,20 @@
   <data name="TPM_NotAvailable" xml:space="preserve">
     <value>此系統上無可用的 TPM</value>
   </data>
+  <data name="TPM_NotAvailableTitle" xml:space="preserve">
+    <value>找不到 TPM</value>
+  </data>
+  <data name="TPM_NotAvailableMessage" xml:space="preserve">
+    <value>這台電腦沒有信賴平台模組 (TPM)。狀態資訊無法顯示，且「清除 TPM」等僅適用於 TPM 的動作已停用。若硬體支援 TPM，請在 BIOS/UEFI 中啟用。</value>
+  </data>
+  <data name="TPM_UnavailableValue" xml:space="preserve">
+    <value>無法使用</value>
+  </data>
   <data name="TPM_AccessDenied" xml:space="preserve">
     <value>TPM 存取被拒——需要系統管理員權限</value>
+  </data>
+  <data name="TPM_AccessDeniedTitle" xml:space="preserve">
+    <value>TPM 存取被拒</value>
   </data>
   <data name="TPM_ClearAllMethodsFailed" xml:space="preserve">
     <value>無法清除 TPM：所有清除方法均失敗。請確保您擁有系統管理員權限，或嘗試在 BIOS/UEFI 中清除 TPM。</value>
