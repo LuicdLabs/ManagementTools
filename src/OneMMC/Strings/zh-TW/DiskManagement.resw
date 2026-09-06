@@ -558,4 +558,13 @@
   <data name="DiskMgmt_Yes" xml:space="preserve">
     <value>是</value>
   </data>
+  <data name="DiskMgmt_OemRecoveryPartition" xml:space="preserve">
+    <value>OEM 復原分割區</value>
+  </data>
+  <data name="DiskMgmt_OemRecoveryWarning" xml:space="preserve">
+    <value>⚠️ OEM 復原分割區 - 此分割區包含製造商的系統復原資源，請勿修改。</value>
+  </data>
+  <data name="DiskMgmt_CannotDeleteOemRecoveryPartition" xml:space="preserve">
+    <value>無法刪除 OEM 復原分割區。製造商使用此分割區進行系統復原。</value>
+  </data>
 </root>

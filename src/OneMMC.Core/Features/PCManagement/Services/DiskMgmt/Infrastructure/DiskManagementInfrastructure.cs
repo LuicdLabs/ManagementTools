@@ -5,6 +5,7 @@ using System.Linq;
 using OneMMC.Core.Features.PCManagement.Models.DiskMgmt;
 using OneMMC.Core.Features.PCManagement.Services.DiskMgmt.Common;
 using OneMMC.Core.Infrastructure.Wmi;
+using OneMMC.Core.Localization;
 using WmiLight;
 
 namespace OneMMC.Core.Features.PCManagement.Services.DiskMgmt
@@ -182,11 +183,14 @@ namespace OneMMC.Core.Features.PCManagement.Services.DiskMgmt
                     if (IsSystemDriveLetter(partition.DriveLetter))
                         return true;
 
+                    // OEM recovery images are intentionally protected even when their disk is
+                    // not currently the system disk (for example, after cloning or migration).
+                    if (partition.IsOemRecoveryPartition)
+                        return true;
+
                     // EFI System Partition - critical for boot (but only on system disk)
-                    // Recovery partition - important but not critical on non-system disks
-                    // MSR (Reserved) partition - NOT critical on non-system disks, can be cleaned
-                    
-                    // Only EFI partition on a disk with system drive is truly critical
+                    // Standard recovery and MSR partitions on non-system disks retain the
+                    // existing clean-disk behavior.
                     if (partition.IsEfiSystemPartition)
                     {
                         // Check if this disk also contains the system drive
@@ -232,10 +236,9 @@ namespace OneMMC.Core.Features.PCManagement.Services.DiskMgmt
             try
             {
                 var partitions = _diskInformationQueries.GetPartitionsForDisk(diskIndex);
-                if (partitionIndex < partitions.Count)
+                var partition = partitions.FirstOrDefault(candidate => candidate.Index == partitionIndex);
+                if (partition is not null)
                 {
-                    var partition = partitions[(int)partitionIndex];
-
                     if (partition.IsSystemDrive)
                         return $"Cannot perform this operation on system partition. Drive \"{GetSystemDriveLetter()}\" contains the Windows operating system.";
 
@@ -244,6 +247,11 @@ namespace OneMMC.Core.Features.PCManagement.Services.DiskMgmt
 
                     if (partition.IsRecoveryPartition)
                         return "Cannot delete Recovery Partition. This partition is used for system recovery.";
+
+                    if (partition.IsOemRecoveryPartition)
+                        return LocalizationProvider.Current.GetString(
+                            ResourceFileNames.DiskManagement,
+                            DiskMgmtKeys.CannotDeleteOemRecoveryPartition);
 
                     if (partition.IsMsrPartition)
                         return "Cannot delete Microsoft Reserved Partition. This partition is required for system operation.";

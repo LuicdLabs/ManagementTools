@@ -1181,6 +1181,22 @@ namespace OneMMC.Core.Features.PCManagement.Services.DiskMgmt
                 }
             }
 
+            // Basic Data GUIDs can still contain OEM recovery images. Reuse the full
+            // partition safety check so direct service calls cannot bypass the UI guard.
+            var diskNumber = partition.GetPropertySafe<uint>("DiskNumber");
+            var partitionNumber = partition.GetPropertySafe<uint>("PartitionNumber");
+            if (partitionNumber > 0)
+            {
+                var safetyMessage = _service.ValidatePartitionOperationSafety(
+                    diskNumber,
+                    partitionNumber - 1);
+                if (!string.IsNullOrEmpty(safetyMessage))
+                {
+                    reason = safetyMessage;
+                    return true;
+                }
+            }
+
             // Additional check: MBR system partition (non-boot)
             var isBoot = partition.GetPropertySafe<bool>("IsBoot");
             var isSystem = partition.GetPropertySafe<bool>("IsSystem");

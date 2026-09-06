@@ -695,7 +695,8 @@ public sealed partial class DiskManagementPage : Page
         if (partition == null) return;
 
         // Check if this is a special partition type that doesn't support resizing
-        if (partition.IsMsrPartition || partition.IsEfiSystemPartition || partition.IsRecoveryPartition)
+        if (partition.IsMsrPartition || partition.IsEfiSystemPartition ||
+            partition.IsRecoveryPartition || partition.IsOemRecoveryPartition)
         {
             await ShowResultDialogAsync("Operation Not Supported", 
                 "This partition type (System/Reserved/Recovery) does not support resizing operations.");
@@ -761,7 +762,8 @@ public sealed partial class DiskManagementPage : Page
         if (partition == null) return;
 
         // Check if this is a special partition type that doesn't support resizing
-        if (partition.IsMsrPartition || partition.IsEfiSystemPartition || partition.IsRecoveryPartition)
+        if (partition.IsMsrPartition || partition.IsEfiSystemPartition ||
+            partition.IsRecoveryPartition || partition.IsOemRecoveryPartition)
         {
             await ShowResultDialogAsync("Operation Not Supported", 
                 "This partition type (System/Reserved/Recovery) does not support resizing operations.");

@@ -249,11 +249,10 @@ namespace OneMMC.Core.Features.PCManagement.Services.DiskMgmt
             if (gptGuid == DiskManagementConstants.MICROSOFT_RESERVED_GUID) return "Reserved";
             if (gptGuid == DiskManagementConstants.BASIC_DATA_PARTITION_GUID) return "Basic";
             if (gptGuid == DiskManagementConstants.WINDOWS_RECOVERY_GUID) return "Recovery";
-            if (gptGuid == DiskManagementConstants.WINDOWS_RE_GUID) return "Recovery";
-            if (gptGuid == DiskManagementConstants.OEM_RECOVERY_GUID) return "Recovery";
             if (gptGuid == DiskManagementConstants.LDM_METADATA_GUID) return "LDM Metadata";
             if (gptGuid == DiskManagementConstants.LDM_DATA_GUID) return "LDM Data";
             if (gptGuid == DiskManagementConstants.BIOS_BOOT_PARTITION_GUID) return "BIOS Boot";
+            if (gptGuid == DiskManagementConstants.LINUX_RESERVED_GUID) return "Linux Reserved";
             return "Unknown";
         }
 
@@ -289,6 +288,11 @@ namespace OneMMC.Core.Features.PCManagement.Services.DiskMgmt
                             var driveLetter = partition.GetPropertySafe<char>("DriveLetter");
                             var isBoot = partition.GetPropertySafe<bool>("IsBoot");
                             var isSystem = partition.GetPropertySafe<bool>("IsSystem");
+                            var isHidden = partition.GetPropertySafe<bool>("IsHidden");
+                            var isReadOnly = partition.GetPropertySafe<bool>("IsReadOnly");
+                            var noDefaultDriveLetter = partition.GetPropertySafe<bool>("NoDefaultDriveLetter");
+                            var partitionGuidText = partition.GetPropertySafe<string>("Guid") ?? string.Empty;
+                            var accessPaths = partition.GetStringArrayPropertySafe("AccessPaths");
 
                             Guid gptGuid = Guid.Empty;
                             string typeStr = "Unknown";
@@ -296,6 +300,10 @@ namespace OneMMC.Core.Features.PCManagement.Services.DiskMgmt
                             {
                                 typeStr = GetPartitionTypeFromGuid(gptGuid);
                             }
+
+                            Guid partitionGuid = Guid.Empty;
+                            if (!string.IsNullOrEmpty(partitionGuidText))
+                                Guid.TryParse(partitionGuidText, out partitionGuid);
 
                             var partInfo = new PartitionInfo
                             {
@@ -308,7 +316,12 @@ namespace OneMMC.Core.Features.PCManagement.Services.DiskMgmt
                                 DiskIndex = diskIndex,
                                 IsBoot = isBoot,
                                 IsSystem = isSystem,
-                                GptPartitionTypeGuid = gptGuid
+                                IsHidden = isHidden,
+                                IsReadOnly = isReadOnly,
+                                NoDefaultDriveLetter = noDefaultDriveLetter,
+                                GptPartitionTypeGuid = gptGuid,
+                                PartitionGuid = partitionGuid,
+                                VolumeGuid = GetVolumeGuidAccessPath(accessPaths)
                             };
 
                             if (driveLetter != '\0' && driveLetter != ' ')
@@ -318,15 +331,23 @@ namespace OneMMC.Core.Features.PCManagement.Services.DiskMgmt
                             }
 
                             partitions.Add(partInfo);
-                            DiagnosticLogger.LogDebug(
-                                $"  Partition {partitionNumber}: {typeStr}, {FormatSize(size)}, " +
-                                $"Drive={partInfo.DriveLetter}");
                         }
                         catch (Exception ex)
                         {
                             DiagnosticLogger.LogDebug($"Error parsing partition entry: {ex.Message}");
                         }
                     }
+                }
+
+                FillDriveLetterlessVolumeInfo(connection, partitions);
+
+                foreach (var partition in partitions)
+                {
+                    DiagnosticLogger.LogDebug(
+                        $"  Partition {partition.Index + 1}: {partition.Type}, {FormatSize(partition.Size)}, " +
+                        $"Drive={partition.DriveLetter}, Hidden={partition.IsHidden}, " +
+                        $"NoDefLetter={partition.NoDefaultDriveLetter}, Label={partition.VolumeLabel}, " +
+                        $"FileSystem={partition.FileSystem}");
                 }
             }
             catch (Exception ex)
@@ -416,6 +437,69 @@ namespace OneMMC.Core.Features.PCManagement.Services.DiskMgmt
             catch (Exception ex)
             {
                 DiagnosticLogger.LogDebug($"FillVolumeInfo({driveLetter}): {ex.Message}");
+            }
+        }
+
+        private static string GetVolumeGuidAccessPath(IEnumerable<string> accessPaths)
+        {
+            foreach (var accessPath in accessPaths)
+            {
+                if (accessPath.StartsWith(@"\\?\Volume{", StringComparison.OrdinalIgnoreCase))
+                    return accessPath;
+            }
+
+            return string.Empty;
+        }
+
+        private static string NormalizeVolumePath(string path)
+        {
+            return path.Trim().TrimEnd('\\');
+        }
+
+        private static void FillDriveLetterlessVolumeInfo(
+            WmiConnection connection,
+            IEnumerable<PartitionInfo> partitions)
+        {
+            var partitionsByVolumePath = new Dictionary<string, PartitionInfo>(StringComparer.OrdinalIgnoreCase);
+            foreach (var partition in partitions)
+            {
+                if (!string.IsNullOrEmpty(partition.DriveLetter) || string.IsNullOrEmpty(partition.VolumeGuid))
+                    continue;
+
+                partitionsByVolumePath.TryAdd(NormalizeVolumePath(partition.VolumeGuid), partition);
+            }
+
+            if (partitionsByVolumePath.Count == 0)
+                return;
+
+            try
+            {
+                foreach (WmiObject volume in connection.CreateQuery("SELECT * FROM MSFT_Volume"))
+                {
+                    using (volume)
+                    {
+                        var path = volume.GetPropertySafe<string>("Path") ?? string.Empty;
+                        var uniqueId = volume.GetPropertySafe<string>("UniqueId") ?? string.Empty;
+
+                        PartitionInfo? partition = null;
+                        if (!string.IsNullOrEmpty(path))
+                            partitionsByVolumePath.TryGetValue(NormalizeVolumePath(path), out partition);
+                        if (partition is null && !string.IsNullOrEmpty(uniqueId))
+                            partitionsByVolumePath.TryGetValue(NormalizeVolumePath(uniqueId), out partition);
+                        if (partition is null)
+                            continue;
+
+                        partition.VolumeLabel = volume.GetPropertySafe<string>("FileSystemLabel") ?? string.Empty;
+                        partition.FileSystem = volume.GetPropertySafe<string>("FileSystem") ?? string.Empty;
+                        partition.TotalSize = volume.GetPropertySafe<ulong>("Size");
+                        partition.FreeSpace = volume.GetPropertySafe<ulong>("SizeRemaining");
+                        partition.DriveType = volume.GetPropertySafe<uint>("DriveType");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogDebug($"Unable to read drive-letterless volume metadata: {ex.Message}");
             }
         }
 

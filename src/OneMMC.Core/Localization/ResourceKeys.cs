@@ -922,6 +922,11 @@ public static class DiskMgmtKeys
     // Access Denied messages
     public const string AccessDenied_Operation = "DiskMgmt_AccessDenied_Operation";
     public const string AccessDenied_AdminRequired = "DiskMgmt_AccessDenied_AdminRequired";
+
+    // Protected partition names and messages
+    public const string OemRecoveryPartition = "DiskMgmt_OemRecoveryPartition";
+    public const string OemRecoveryWarning = "DiskMgmt_OemRecoveryWarning";
+    public const string CannotDeleteOemRecoveryPartition = "DiskMgmt_CannotDeleteOemRecoveryPartition";
 }
 
 /// <summary>

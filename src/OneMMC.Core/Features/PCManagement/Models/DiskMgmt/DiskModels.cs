@@ -120,19 +120,47 @@ namespace OneMMC.Core.Features.PCManagement.Models.DiskMgmt
         public uint DriveType { get; set; }
         public string VolumeSerialNumber { get; set; } = string.Empty;
         public bool SupportsFileCompression { get; set; }
-        
+
         /// <summary>
-        /// GPT Partition Type GUID for identifying system partitions
+        /// GPT partition type GUID reported by <c>MSFT_Partition.GptType</c>.
         /// </summary>
         public Guid GptPartitionTypeGuid { get; set; } = Guid.Empty;
-        
+
         /// <summary>
-        /// Indicates if this partition contains boot files (from MSFT_Partition.IsBoot)
+        /// Unique GPT partition GUID reported by <c>MSFT_Partition.Guid</c>.
+        /// </summary>
+        public Guid PartitionGuid { get; set; } = Guid.Empty;
+
+        /// <summary>
+        /// Volume GUID access path from <c>MSFT_Partition.AccessPaths</c>, when available.
+        /// </summary>
+        public string VolumeGuid { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Indicates whether Mount Manager hides this partition, as reported by
+        /// <c>MSFT_Partition.IsHidden</c>.
+        /// </summary>
+        public bool IsHidden { get; set; }
+
+        /// <summary>
+        /// Indicates whether Windows suppresses automatic drive-letter assignment, as
+        /// reported by <c>MSFT_Partition.NoDefaultDriveLetter</c>.
+        /// </summary>
+        public bool NoDefaultDriveLetter { get; set; }
+
+        /// <summary>
+        /// Indicates whether the partition is read-only, as reported by
+        /// <c>MSFT_Partition.IsReadOnly</c>.
+        /// </summary>
+        public bool IsReadOnly { get; set; }
+
+        /// <summary>
+        /// Indicates if this partition contains boot files (from MSFT_Partition.IsBoot).
         /// </summary>
         public bool IsBoot { get; set; }
-        
+
         /// <summary>
-        /// Indicates if this is a system partition (from MSFT_Partition.IsSystem)
+        /// Indicates if this is a system partition (from MSFT_Partition.IsSystem).
         /// </summary>
         public bool IsSystem { get; set; }
 
@@ -148,6 +176,11 @@ namespace OneMMC.Core.Features.PCManagement.Models.DiskMgmt
             get
             {
                 if (IsUnallocated) return GetString("DiskMgmt_UnallocatedSpace");
+                if (IsOemRecoveryPartition)
+                    return !string.IsNullOrEmpty(VolumeLabel)
+                        ? VolumeLabel
+                        : GetString(DiskMgmtKeys.OemRecoveryPartition);
+
                 // Provide meaningful names for system partitions without drive letters
                 if (IsEfiSystemPartition) return "EFI System Partition";
                 if (IsRecoveryPartition) return "Recovery Partition";
@@ -177,10 +210,27 @@ namespace OneMMC.Core.Features.PCManagement.Models.DiskMgmt
             [new("C12A7328-F81F-11D2-BA4B-00A0C93EC93B")] = new("EFI System Partition", "SYSTEM", DangerLevel.Blocked, 50UL * 1024 * 1024, 550UL * 1024 * 1024),
             [new("E3C9E316-0B5C-4DB8-817D-F92DF00215AE")] = new("Microsoft Reserved Partition", "RESERVED", DangerLevel.Blocked),
             [new("DE94BBA4-06D1-4D40-A16A-BFD50179D6AC")] = new("Recovery Partition", "RECOVERY", DangerLevel.Blocked, 350UL * 1024 * 1024, 20UL * 1024 * 1024 * 1024),
-            [new("8DA63339-0007-60C0-C436-083AC8230908")] = new("Windows RE Partition", "RECOVERY", DangerLevel.Blocked, 350UL * 1024 * 1024, 20UL * 1024 * 1024 * 1024),
-            [new("F0FD8DC9-0438-4741-8E12-7E0C412A9930")] = new("OEM Recovery Partition", "RECOVERY", DangerLevel.Blocked, 350UL * 1024 * 1024, 20UL * 1024 * 1024 * 1024),
             [new("21686148-6449-6E6F-744E-656564454649")] = new("BIOS Boot Partition", "BIOS BOOT", DangerLevel.Blocked),
+            [new("8DA63339-0007-60C0-C436-083AC8230908")] = new("Linux Reserved Partition", "LINUX RESERVED", DangerLevel.Safe),
             [new("EBD0A0A2-B9E5-4433-87C0-68B6B72699C7")] = new("Basic Data Partition", "BASIC", DangerLevel.Safe)
+        };
+
+        private static readonly Guid BasicDataPartitionGuid = new("EBD0A0A2-B9E5-4433-87C0-68B6B72699C7");
+
+        private static readonly string[] OemRecoveryLabelMarkers =
+        {
+            "RESTORE",
+            "RECOVERY",
+            "WINRE",
+            "MYASUS",
+            "PQSERVICE",
+            "PBR_DRV",
+            "WINRE_DRV",
+            "ONEKEY",
+            "FACTORY",
+            "RE-IMAGE",
+            "RECOVERYIMAGE",
+            "SYSTEM_IMAGE"
         };
 
         private record PartitionTypeInfo(string DisplayName, string TypeKeyword, DangerLevel DangerLevel, ulong? MinSize = null, ulong? MaxSize = null);
@@ -256,9 +306,49 @@ namespace OneMMC.Core.Features.PCManagement.Models.DiskMgmt
         public bool IsEfiSystemPartition => GetPartitionTypeInfo()?.DisplayName == "EFI System Partition";
         
         /// <summary>
-        /// Checks if this is a Recovery Partition
+        /// Checks if this is a recovery partition identified by a standard partition type.
         /// </summary>
         public bool IsRecoveryPartition => GetPartitionTypeInfo()?.TypeKeyword == "RECOVERY";
+
+        /// <summary>
+        /// Checks for an OEM recovery image stored in a Basic Data partition. Some OEMs
+        /// intentionally use this layout so the partition can host a normal NTFS/FAT32
+        /// volume while suppressing automatic drive-letter assignment.
+        /// </summary>
+        public bool IsOemRecoveryPartition => IsOemRecoveryPartitionCore();
+
+        private bool IsOemRecoveryPartitionCore()
+        {
+            if (IsUnallocated ||
+                GptPartitionTypeGuid != BasicDataPartitionGuid ||
+                !string.IsNullOrEmpty(DriveLetter) ||
+                !NoDefaultDriveLetter ||
+                string.IsNullOrEmpty(VolumeGuid) ||
+                IsBoot ||
+                IsSystem ||
+                IsSystemDrive)
+            {
+                return false;
+            }
+
+            var hasSupportedFileSystem =
+                FileSystem.Equals("NTFS", StringComparison.OrdinalIgnoreCase) ||
+                FileSystem.Equals("FAT32", StringComparison.OrdinalIgnoreCase);
+            if (!hasSupportedFileSystem)
+                return false;
+
+            var label = VolumeLabel ?? string.Empty;
+            foreach (var marker in OemRecoveryLabelMarkers)
+            {
+                if (label.Contains(marker, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            var partitionSize = TotalSize > 0 ? TotalSize : Size;
+            const ulong minOemRecoverySize = 1UL * 1024 * 1024 * 1024;
+            const ulong maxOemRecoverySize = 64UL * 1024 * 1024 * 1024;
+            return partitionSize >= minOemRecoverySize && partitionSize <= maxOemRecoverySize;
+        }
         
         /// <summary>
         /// Checks if this is a Microsoft Reserved Partition (MSR)
@@ -302,7 +392,8 @@ namespace OneMMC.Core.Features.PCManagement.Models.DiskMgmt
             IsEfiSystemPartition || 
             IsMsrPartition || 
             IsBiosBootPartition ||
-            IsRecoveryPartition;
+            IsRecoveryPartition ||
+            IsOemRecoveryPartition;
         
         /// <summary>
         /// Checks if this partition is important and operations should be blocked
@@ -326,7 +417,11 @@ namespace OneMMC.Core.Features.PCManagement.Models.DiskMgmt
         /// </summary>
         public DangerLevel GetDangerLevel()
         {
-            // Check partition type first (most reliable)
+            // A Basic Data GUID normally maps to Safe, so check the stricter OEM signals first.
+            if (IsOemRecoveryPartition)
+                return DangerLevel.Blocked;
+
+            // Check partition type next (most reliable for standard system partitions).
             var partitionTypeInfo = GetPartitionTypeInfo();
             if (partitionTypeInfo != null)
                 return partitionTypeInfo.DangerLevel;
@@ -353,6 +448,7 @@ namespace OneMMC.Core.Features.PCManagement.Models.DiskMgmt
             !IsUnallocated &&
             !IsCriticalSystemPartition && 
             !IsRecoveryPartition &&
+            !IsOemRecoveryPartition &&
             !IsBoot &&
             !IsSystem;
         
@@ -364,21 +460,24 @@ namespace OneMMC.Core.Features.PCManagement.Models.DiskMgmt
         {
             get
             {
+                if (IsOemRecoveryPartition)
+                    return GetString(DiskMgmtKeys.OemRecoveryWarning);
+
                 var partitionTypeInfo = GetPartitionTypeInfo();
                 if (partitionTypeInfo != null)
                 {
                     return partitionTypeInfo.DisplayName switch
                     {
-                        "EFI System Partition" => "âš ï¸ EFI System Partition - This partition is required for boot, do not modify",
-                        "Microsoft Reserved Partition" => "âš ï¸ Microsoft Reserved Partition - This partition is required for system operation",
-                        "BIOS Boot Partition" => "âš ï¸ BIOS Boot Partition - This partition is required for boot",
-                        var name when name.Contains("Recovery") => "âš ï¸ Recovery Partition - This partition is used for system recovery, do not modify",
+                        "EFI System Partition" => "⚠️ EFI System Partition - This partition is required for boot, do not modify",
+                        "Microsoft Reserved Partition" => "⚠️ Microsoft Reserved Partition - This partition is required for system operation",
+                        "BIOS Boot Partition" => "⚠️ BIOS Boot Partition - This partition is required for boot",
+                        var name when name.Contains("Recovery") => "⚠️ Recovery Partition - This partition is used for system recovery, do not modify",
                         _ => null
                     };
                 }
                 
-                if (IsSystemDrive) return $"âš ï¸ System Drive ({SystemDriveLetter}) - Contains Windows operating system";
-                if (IsBoot || IsSystem) return "âš ï¸ Boot/System Partition - Contains boot files";
+                if (IsSystemDrive) return $"⚠️ System Drive ({SystemDriveLetter}) - Contains Windows operating system";
+                if (IsBoot || IsSystem) return "⚠️ Boot/System Partition - Contains boot files";
                 return null;
             }
         }
