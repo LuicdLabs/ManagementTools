@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using OneMMC.Models;
@@ -7,17 +6,17 @@ using OneMMC.Models;
 namespace OneMMC.Views.Commons;
 
 /// <summary>
-/// A welcome dialog shown on first launch or when the user opts to be reminded later.
-/// Provides an overview of the application and a way to delay the reminder.
+/// A welcome dialog shown on first launch until the user opts out.
+/// Provides an overview of the application and a do-not-show-again option.
 /// </summary>
 public sealed partial class WelcomeDialog : ContentDialog
 {
     private readonly List<string> _featureStrings;
 
     /// <summary>
-    /// Gets a value indicating whether the user chose to be reminded after 30 days.
+    /// Gets a value indicating whether the user chose to never show this dialog again.
     /// </summary>
-    public bool RemindAfter30Days { get; private set; }
+    public bool DoNotShowAgain { get; private set; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WelcomeDialog"/> class.
@@ -39,9 +38,9 @@ public sealed partial class WelcomeDialog : ContentDialog
 
         FeatureList.ItemsSource = _featureStrings;
 
-        RemindAfter30Days = false;
-        RemindCheckBox.Checked += (_, _) => RemindAfter30Days = true;
-        RemindCheckBox.Unchecked += (_, _) => RemindAfter30Days = false;
+        DoNotShowAgain = false;
+        DoNotShowCheckBox.Checked += (_, _) => DoNotShowAgain = true;
+        DoNotShowCheckBox.Unchecked += (_, _) => DoNotShowAgain = false;
         PrimaryButtonClick += WelcomeDialog_PrimaryButtonClick;
 
         RequestedTheme = App.CurrentTheme;
@@ -52,11 +51,10 @@ public sealed partial class WelcomeDialog : ContentDialog
 
     private void WelcomeDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
     {
-        if (RemindAfter30Days)
+        if (DoNotShowAgain)
         {
             var settings = AppSettings.Load();
             settings.WelcomeDialogHidden = true;
-            settings.WelcomeDialogDismissedDate = DateTime.Now.ToString("yyyy-MM-dd");
             settings.Save();
         }
     }

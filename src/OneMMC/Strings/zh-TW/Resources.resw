@@ -159,8 +159,8 @@
   <data name="WelcomeDialog_WarningMessage" xml:space="preserve">
     <value>該軟體正在開發中。可能會修改您的系統元件。請在隔離環境或虛擬機器中使用</value>
   </data>
-  <data name="WelcomeDialog_RemindAfter30Days" xml:space="preserve">
-    <value>30 天後再提醒我</value>
+  <data name="WelcomeDialog_DoNotShowAgain" xml:space="preserve">
+    <value>永遠不再提醒</value>
   </data>
   <data name="WelcomeDialog_LetsExplore" xml:space="preserve">
     <value>開始探索</value>

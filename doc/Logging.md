@@ -1,5 +1,9 @@
 ﻿# Logging Technical Documentation
 
+This document is the authoritative reference for OneMMC logging. Other documents
+(`.github/copilot-instructions.md`, `AGENTS.md`, `.github/CONTRIBUTING.md`, the project READMEs) only
+summarize these rules and link here.
+
 ## Purpose
 
 OneMMC uses one logging pipeline across UI and Core:

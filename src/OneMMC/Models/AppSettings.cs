@@ -24,6 +24,8 @@ public class AppSettings
     /// <summary>
     /// Gets or sets the date when the welcome dialog was last dismissed.
     /// Stored as ISO 8601 string (e.g. "2026-01-15").
+    /// Legacy from the previous 30-day reminder behavior; no longer written or read.
+    /// Kept so existing settings files continue to deserialize.
     /// </summary>
     public string? WelcomeDialogDismissedDate { get; set; }
 
