@@ -65,10 +65,12 @@ namespace OneMMC.Core.Features.SystemManagement.ViewModels.TPM
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(CanClearTpm))]
         [NotifyPropertyChangedFor(nameof(ShowUnavailableBanner))]
+        [NotifyPropertyChangedFor(nameof(IsUnavailableBannerClosable))]
         public partial bool IsTpmAvailable { get; set; }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(CanClearTpm))]
+        [NotifyPropertyChangedFor(nameof(IsUnavailableBannerClosable))]
         public partial bool IsTpmAccessDenied { get; set; }
 
         [ObservableProperty]
@@ -93,6 +95,11 @@ namespace OneMMC.Core.Features.SystemManagement.ViewModels.TPM
         /// Persistent banner shown after the first query when no TPM can be used.
         /// </summary>
         public bool ShowUnavailableBanner => IsTpmStatusLoaded && !IsTpmAvailable;
+
+        /// <summary>
+        /// The missing-TPM notice must stay visible; other notices remain dismissible.
+        /// </summary>
+        public bool IsUnavailableBannerClosable => IsTpmAccessDenied;
 
         public TPMManagerViewModel(TPMService tpmService)
         {
@@ -188,7 +195,7 @@ namespace OneMMC.Core.Features.SystemManagement.ViewModels.TPM
                     ClearTpmDescription = L.GetString(ResourceFileNames.TPM, TPMKeys.ClearTPMDisabledDescription);
                     UnavailableBannerTitle = L.GetString(ResourceFileNames.TPM, TPMKeys.NotAvailableTitle);
                     UnavailableBannerMessage = L.GetString(ResourceFileNames.TPM, TPMKeys.NotAvailableMessage);
-                    UnavailableBannerSeverity = TpmStatusSeverity.Error;
+                    UnavailableBannerSeverity = TpmStatusSeverity.Warning;
                 }
 
                 return;

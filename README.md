@@ -41,7 +41,7 @@ A modern Windows system management suite built with WinUI 3, designed as a strea
 
 ## 🚀 Native AOT
 
-OneMMC ships as Native AOT. a single native executable with faster startup and a \~69% smaller footprint than ReadyToRun publish (224 MB → \~70 MB). The `PublishAot` applies to every configuration (Debug and Release): all COM interop is source-generated, WMI/CIM runs on WmiLight and a marshal-free `IWbemServices` wrapper, directory/account/counter access runs on ADSI/NetAPI32/PDH via CsWin32, and the AOT/trim analyzers guard every build
+OneMMC compiles as a single native executable with instant startup and a smaller size than ReadyToRun. The entire codebase is strictly optimized for Native AOT, eliminating runtime reflection and trimming issues
 
 ---
 

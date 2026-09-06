@@ -32,7 +32,7 @@
 			<InfoBar
 				x:Name="UnavailableInfoBar"
 				Title="{x:Bind ViewModel.UnavailableBannerTitle, Mode=OneWay}"
-				IsClosable="True"
+				IsClosable="{x:Bind ViewModel.IsUnavailableBannerClosable, Mode=OneWay}"
 				IsOpen="{x:Bind ViewModel.ShowUnavailableBanner, Mode=OneWay}"
 				Message="{x:Bind ViewModel.UnavailableBannerMessage, Mode=OneWay}"
 				Severity="{x:Bind ViewModel.UnavailableBannerSeverity, Mode=OneWay, Converter={StaticResource SeverityConverter}}" />
